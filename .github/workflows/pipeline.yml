@@ -1,0 +1,52 @@
+name: Parallel Docker API Pipeline
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  java-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Java Docker image
+        run: docker build -t demo-java:${{ github.sha }} ./java-api
+
+  node-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Node Docker image
+        run: docker build -t demo-node:${{ github.sha }} ./node-api
+
+  python-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Python Docker image
+        run: docker build -t demo-python:${{ github.sha }} ./python-api
+
+  # All three must pass before any deployment starts.
+  # Deployment jobs also run in parallel with each other.
+  java-deploy:
+    needs: [java-build, node-build, python-build]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'Simulated DEV deployment - Java API'
+
+  node-deploy:
+    needs: [java-build, node-build, python-build]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'Simulated DEV deployment - Node API'
+
+  python-deploy:
+    needs: [java-build, node-build, python-build]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'Simulated DEV deployment - Python API'
