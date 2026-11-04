@@ -11,8 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build Java Docker image
-        run: docker build -t demo-java:${{ github.sha }} ./java-api
+        - name: Build Java Docker image
+         run: docker build -t demo-java:${{ github.sha }} ./java-api
 
   node-build:
     runs-on: ubuntu-latest
