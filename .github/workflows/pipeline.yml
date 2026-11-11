@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build Node Docker image
-        run: docker build -t demo-node:${{ github.sha }} ./node-apid
+        run: docker build -t demo-node:${{ github.sha }} ./node-api
 
   python-build:
     runs-on: ubuntu-latest
