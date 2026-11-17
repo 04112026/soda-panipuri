@@ -1,3 +1,4 @@
+
 name: Parallel Docker API Pipeline
 
 on:
@@ -28,24 +29,59 @@ jobs:
       - name: Build Python Docker image
         run: docker build -t demo-python:${{ github.sha }} ./python-api
 
-  # All three must pass before any deployment starts.
-  # Deployment jobs also run in parallel with each other.
-  java-deploy:
+  # Push Java Docker image to AWS ECR
+  push-to-ecr:
     needs: [java-build, node-build, python-build]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-north-1
+
+      - name: Verify AWS connection
+        run: aws sts get-caller-identity
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, Tag and Push Docker Image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          REPO: training/java-api
+          TAG: ${{ github.sha }}
+        run: |
+          docker build -t demo-java:$TAG ./java-api
+          docker tag demo-java:$TAG "$REGISTRY/$REPO:$TAG"
+          docker push "$REGISTRY/$REPO:$TAG"
+
+  # Deployment jobs run in parallel
+  java-deploy:
+    needs: [push-to-ecr]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - run: echo 'Simulated DEV deployment - Java API'
 
   node-deploy:
-    needs: [java-build, node-build, python-build]
+    needs: [push-to-ecr]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - run: echo 'Simulated DEV deployment - Node API'
 
   python-deploy:
-    needs: [java-build, node-build, python-build]
+    needs: [push-to-ecr]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
