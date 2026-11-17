@@ -42,17 +42,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Debug OIDC
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const token = await core.getIDToken('sts.amazonaws.com');
-            const claims = JSON.parse(
-              Buffer.from(token.split('.')[1], 'base64url').toString()
-            );
-            console.log("Subject:", claims.sub);
-            console.log("Audience:", claims.aud);
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
