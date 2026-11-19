@@ -4,9 +4,10 @@ variable "ci_role_arn" {
 }
 variable "local_principal_arn" {
   type        = string
-  description = "Existing IAM user/role ARN for laptop; not root or an STS session ARN."
+  description = "Optional IAM user/role ARN for laptop; not root or an STS session ARN."
+  default     = ""
   validation {
-    condition     = can(regex("^arn:aws:iam::[0-9]{12}:(user|role)/.+$", var.local_principal_arn))
+    condition     = var.local_principal_arn == "" || can(regex("^arn:aws:iam::[0-9]{12}:(user|role)/.+$", var.local_principal_arn))
     error_message = "Use an IAM user or role ARN, not root or an STS assumed-role ARN."
   }
 }

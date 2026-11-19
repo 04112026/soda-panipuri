@@ -18,24 +18,24 @@ Reuse account `686511309747`, region `eu-north-1`, ECR `training/java-api`, GitH
 
 **AWS: new infrastructure IAM role.** IAM → Roles → Create role → Web identity → GitHub provider → audience `sts.amazonaws.com`. Name `GitHubActions-EKS-Infra-Role`. Edit trust using `docs/infra-role-trust.json` (numeric IDs observed in the previous session; main branch only). Require protected main with reviews. Terraform needs permissions to provision IAM roles, VPC, EKS, RDS, ECR and read/write state and secrets. In an isolated disposable training account ONLY, you can temporarily attach `AdministratorAccess` to this dedicated role; this is broad and unsafe for shared/production accounts. For those, have the administrator supply a scoped provisioning role. Remove lab privileges after destruction. No permanent access keys required.
 
-**AWS: Terraform state bucket.** Create a private S3 bucket in eu-north-1, globally unique name e.g. `training-eks-tfstate-686511309747-01` (choose another if taken). Block public access, enable versioning and SSE-S3 default encryption. The two Terraform stacks use distinct state keys and S3-native lock files. The state bucket is created outside Terraform and retained after destroy. Never commit state or plans.
+**Pipeline-managed bootstrap:** No manual S3 creation or new GitHub settings are required. The workflow defaults to the existing infrastructure role ARN and the dedicated `training-tfstate-686511309747` bucket in eu-north-1. It creates the bucket if absent, blocks public access, enables versioning and SSE-S3 encryption before Terraform init. The bucket is retained during destroy. If you already use a dedicated state bucket, set the `TF_STATE_BUCKET` repository variable **before** deploying to continue using that same state; never switch buckets without migrating state. The bootstrap configures the selected bucket and should only be used on a dedicated lab state bucket.
 
-**AWS: laptop identity.** EKS access entries use an IAM user/role, not root or an STS session ARN. Use an existing identity if possible. If you only have root, create a console-enabled IAM user `training-eks-local`, attach `SignInLocalDevelopmentAccess` if needed for `aws login` and inline policy `docs/local-eks-policy.json` (DescribeCluster). Enable MFA; no static keys needed. Copy the exact IAM user/role ARN from IAM. Terraform grants this identity Kubernetes cluster-admin for the disposable demo. The root login used for ECR is not the identity to use for EKS. Existing IAM Identity Center roles can also work; use the actual IAM role ARN, not the STS session ARN.
+**Optional laptop access:** To connect locally, use an existing IAM user/role ARN (not root or an STS session ARN) and enter it in the workflow's `local_principal_arn` input or set the `EKS_LOCAL_PRINCIPAL_ARN` repository variable. If both are blank, only the CI role is granted administrative Kubernetes access; you can still inspect logs from Actions. Use the same optional ARN on subsequent deploys to retain that access. If needed, create a console-enabled IAM user `training-eks-local` with MFA, `SignInLocalDevelopmentAccess` if required for `aws login`, and `docs/local-eks-policy.json` (DescribeCluster). No permanent access keys required. The workflow does not create a local user automatically.
 
-**GitHub → Settings → Secrets and variables → Actions:**
+**GitHub optional overrides:**
 
 | Type | Name | Value |
 |---|---|---|
-| Secret | `AWS_INFRA_ROLE_ARN` | `arn:aws:iam::686511309747:role/GitHubActions-EKS-Infra-Role` (actual ARN) |
-| Variable | `TF_STATE_BUCKET` | Actual dedicated state bucket name |
-| Variable | `EKS_LOCAL_PRINCIPAL_ARN` | `arn:aws:iam::686511309747:user/training-eks-local` or existing IAM user/role ARN |
+| Secret | `AWS_INFRA_ROLE_ARN` | Override the default infrastructure role ARN if different |
+| Variable | `TF_STATE_BUCKET` | Override the default dedicated state bucket name if needed |
+| Variable | `EKS_LOCAL_PRINCIPAL_ARN` | Optional existing IAM user or role ARN for local access |
 | Existing secret | `AWS_ROLE_ARN` | Leave unchanged; original ECR demo |
 
 ## 2. Deploy via GitHub Actions
 
 1. Copy ZIP contents into your existing repo (keep your local `.git`), commit on a branch and merge to `main`.
 2. Actions → **EKS Training - Terraform and Deployment** → Run workflow → main → `operation=deploy`. Leave `enable_python=false` for two pods.
-3. `infrastructure`: Terraform init, validate, plan, apply. Creates EKS, private DB and repos. This is chargeable and can take many minutes.
+3. `infrastructure`: Bootstrap state bucket, then Terraform init, validate, plan, apply. Creates EKS, private DB and repos. This is chargeable and can take many minutes.
 4. `publish`: three parallel Docker build/push jobs. A unique tag includes Git SHA, run ID and attempt. Kubernetes workers pull images from ECR using their IAM role (no imagePullSecret).
 5. `deploy`: configure kubeconfig, namespace and secret, apply separate workload Terraform state, display pod logs. Java initializes the table; Node retries until it exists.
 6. If a run fails, correct the error and trigger a fresh deploy with the same inputs. Durable state prevents unnecessary recreation. Do not delete state to fix errors, or unlock while a workflow runs.

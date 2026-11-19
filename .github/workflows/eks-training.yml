@@ -7,6 +7,11 @@ on:
         type: choice
         options: [deploy, destroy]
         default: deploy
+      local_principal_arn:
+        description: Optional IAM user or role ARN for laptop access (leave blank for CI only)
+        type: string
+        required: false
+        default: ''
       enable_python:
         description: Deploy optional third Python API pod
         type: boolean
@@ -20,9 +25,10 @@ concurrency:
 env:
   AWS_REGION: eu-north-1
   TF_IN_AUTOMATION: 'true'
-  TF_VAR_ci_role_arn: ${{ secrets.AWS_INFRA_ROLE_ARN }}
-  TF_VAR_local_principal_arn: ${{ vars.EKS_LOCAL_PRINCIPAL_ARN }}
-  STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+  # IAM role ARNs are identifiers, not credentials. Secret override is optional.
+  TF_VAR_ci_role_arn: ${{ secrets.AWS_INFRA_ROLE_ARN || 'arn:aws:iam::686511309747:role/GitHubActions-EKS-Infra-Role' }}
+  TF_VAR_local_principal_arn: ${{ inputs.local_principal_arn || vars.EKS_LOCAL_PRINCIPAL_ARN || '' }}
+  STATE_BUCKET: ${{ vars.TF_STATE_BUCKET || 'training-tfstate-686511309747' }}
   IMAGE_TAG: eks-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
 jobs:
   infrastructure:
@@ -37,17 +43,18 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_INFRA_ROLE_ARN }}
+          role-to-assume: ${{ env.TF_VAR_ci_role_arn }}
           aws-region: eu-north-1
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.12.2
           terraform_wrapper: false
+      - name: Bootstrap Terraform state bucket
+        run: bash scripts/bootstrap-state.sh
       - name: Provision EKS, RDS and ECR
         run: |
           set -euo pipefail
           test -n "$STATE_BUCKET"
-          test -n "$TF_VAR_local_principal_arn"
           aws sts get-caller-identity
           terraform -chdir=terraform/infra init -backend-config="bucket=$STATE_BUCKET"
           terraform -chdir=terraform/infra validate
@@ -70,7 +77,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_INFRA_ROLE_ARN }}
+          role-to-assume: ${{ env.TF_VAR_ci_role_arn }}
           aws-region: eu-north-1
       - uses: aws-actions/amazon-ecr-login@v2
       - name: Build and publish image
@@ -101,7 +108,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_INFRA_ROLE_ARN }}
+          role-to-assume: ${{ env.TF_VAR_ci_role_arn }}
           aws-region: eu-north-1
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -138,7 +145,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_INFRA_ROLE_ARN }}
+          role-to-assume: ${{ env.TF_VAR_ci_role_arn }}
           aws-region: eu-north-1
       - uses: hashicorp/setup-terraform@v3
         with:

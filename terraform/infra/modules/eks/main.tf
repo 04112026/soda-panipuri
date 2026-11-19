@@ -93,9 +93,9 @@ resource "aws_eks_node_group" "lab" {
   }
   depends_on = [aws_iam_role_policy_attachment.node, aws_route_table_association.worker]
 }
-# Explicit access for the CI role and existing laptop IAM identity.
+# Explicit access for CI and optional distinct laptop IAM identity.
 resource "aws_eks_access_entry" "admin" {
-  for_each      = { ci = var.ci_role_arn, local = var.local_principal_arn }
+  for_each      = merge({ ci = var.ci_role_arn }, var.local_principal_arn != "" && var.local_principal_arn != var.ci_role_arn ? { local = var.local_principal_arn } : {})
   cluster_name  = aws_eks_cluster.lab.name
   principal_arn = each.value
   type          = "STANDARD"

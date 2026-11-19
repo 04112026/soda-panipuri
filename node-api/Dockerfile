@@ -1,4 +1,4 @@
-FROM node:24-alpine
+FROM node:22-alpine
 WORKDIR /app
 # Layer 1: dependency manifest; cache npm install unless it changes
 COPY package.json ./
