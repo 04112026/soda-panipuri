@@ -59,10 +59,20 @@ jobs:
         env:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
           REPO: training/java-api
-          TAG: ${{ github.sha }}
+          TAG: "Personal-agenda"
         run: |
           docker build -t demo-java:$TAG ./java-api
           docker tag demo-java:$TAG "$REGISTRY/$REPO:$TAG"
+          docker push "$REGISTRY/$REPO:$TAG"
+          
+      - name: Build, Tag and Push Docker Image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          REPO: training/feapi
+          TAG: "Personal-agendafe"
+        run: |
+          docker build -t demo-node:$TAG ./node-api
+          docker tag demo-node:$TAG "$REGISTRY/$REPO:$TAG"
           docker push "$REGISTRY/$REPO:$TAG"
 
   # Deployment jobs run in parallel
