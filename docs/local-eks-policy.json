@@ -1,0 +1,4 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [{"Effect":"Allow","Action":"eks:DescribeCluster","Resource":"arn:aws:eks:eu-north-1:686511309747:cluster/training-eks"}]
+}

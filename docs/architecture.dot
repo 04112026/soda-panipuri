@@ -1,0 +1,36 @@
+digraph lab {
+  graph [rankdir=TB,bgcolor="white",fontname="DejaVu Sans",labelloc=t,label="EKS TRAINING LAB  |  GitHub Actions → ECR → Kubernetes → PostgreSQL",fontsize=21,pad=0.35,nodesep=0.45,ranksep=0.7,compound=true];
+  node [shape=box,style="rounded,filled",fontname="DejaVu Sans",fontsize=12,color="#344960",fillcolor="#F4F7FA",margin="0.17,0.11"];
+  edge [fontname="DejaVu Sans",fontsize=10,color="#52697D",arrowsize=0.7];
+  gh [label="GitHub Actions\nManual deploy / destroy\nOIDC • Terraform • Docker",fillcolor="#E6EDF5"];
+  laptop [label="Windows laptop\nAWS CLI • kubectl\nBrowser / logs",fillcolor="#E6EDF5"];
+  subgraph cluster_aws { label="AWS  |  eu-north-1"; color="#C1843B"; style="rounded"; fontsize=15;
+    iam [label="IAM + STS\nCI role / local identity",fillcolor="#FFF1DF"];
+    ecr [label="Amazon ECR\ntraining/java-api (existing)\ntraining/eks-node-api\ntraining/eks-python-api",fillcolor="#FFF1DF"];
+    state [label="S3 backend\nInfra + workload state\nSeparate lock files",fillcolor="#FFF1DF"];
+    secrets [label="Secrets Manager\nRDS-generated password",fillcolor="#FFF1DF"];
+    api [label="EKS control plane\nIAM-authenticated API",fillcolor="#E5EFFD"];
+    subgraph cluster_vpc { label="VPC 10.20.0.0/16  |  two availability zones"; style="rounded"; color="#53798E";
+      subgraph cluster_eks { label="Managed EC2 node group  |  training namespace"; style="rounded"; color="#53798E";
+        java [label="Java API  •  :8080\n1 pod + ClusterIP\nSeeds and reads row",fillcolor="#E5EFFD"];
+        nodeapi [label="Node.js API  •  :3000\n1 pod + ClusterIP\nReads row",fillcolor="#E5EFFD"];
+        py [label="Python API  •  :5000\nOptional third pod",style="rounded,dashed,filled",fillcolor="#F5F7FA"];
+        {rank=same; java;nodeapi;py;}
+      }
+      rds [label="Private RDS PostgreSQL\ntraining database\ntraining_messages table\nTCP 5432 / EKS SG only",fillcolor="#E0F3E9"];
+    }
+  }
+  gh -> iam [label="OIDC JWT"];
+  iam -> api [label="access entry"];
+  gh -> state [label="state / locks"];
+  gh -> ecr [label="build + push"];
+  gh -> api [label="apply workloads"];
+  ecr -> java [label="pull"];
+  ecr -> nodeapi [label="pull"];
+  ecr -> py [label="optional pull",style=dashed];
+  api -> java [label="schedule",style=dashed];
+  java -> rds [label="SQL / TLS"];
+  nodeapi -> rds [label="SQL / TLS"];
+  rds -> secrets [label="managed credentials",dir=both];
+  laptop -> api [label="kubectl / port-forward"];
+}
